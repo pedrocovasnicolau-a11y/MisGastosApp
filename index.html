@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Meta etiquetas para PWA y Android -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" id="manifest-link">
+    
+    <title>Control de Gastos Pro - Mensual y Anual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Estilos optimizados para móvil */
+        @media (max-width: 640px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 pb-20"> <!-- Padding inferior para no tapar con botones de navegación -->
+    <div class="max-w-6xl mx-auto">
+        <!-- Header & Estadísticas Rápidas -->
+        <header class="mb-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Finanzas Personales</h1>
+                    <p class="text-slate-500">Control total diario, mensual y anual</p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="installBtn" class="hidden px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl shadow-md hover:bg-indigo-700 transition-all">
+                        Instalar App
+                    </button>
+                    <button id="clearBtn" class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">
+                        Limpiar Datos
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 stats-grid">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                    <span class="text-slate-500 text-sm font-medium uppercase tracking-wider">Hoy</span>
+                    <h3 id="totalToday" class="text-2xl font-bold text-slate-800 mt-1">$ 0.00</h3>
+                </div>
+                <div class="bg-indigo-600 p-6 rounded-3xl shadow-lg text-white">
+                    <span class="text-indigo-100 text-sm font-medium uppercase tracking-wider">Mes Actual</span>
+                    <h3 id="totalMonth" class="text-2xl font-bold mt-1">$ 0.00</h3>
+                </div>
+                <div class="bg-slate-900 p-6 rounded-3xl shadow-lg text-white">
+                    <span class="text-slate-400 text-sm font-medium uppercase tracking-wider">Año <span id="currentYearLabel"></span></span>
+                    <h3 id="totalYear" class="text-2xl font-bold mt-1">$ 0.00</h3>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Columna Izquierda: Formularios -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- Formulario Gasto -->
+                <div class="glass-card p-6 rounded-3xl shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 text-slate-800 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        Añadir Gasto
+                    </h2>
+                    <form id="expenseForm" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1 text-xs">Descripción</label>
+                                <input type="text" id="description" required placeholder="Ej: Supermercado" 
+                                    class="w-full p-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-indigo-500 transition-all text-base">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1 text-xs">Monto ($)</label>
+                                <input type="number" id="amount" required step="0.01" placeholder="0.00" inputmode="decimal"
+                                    class="w-full p-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-indigo-500 transition-all text-base">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1 text-xs">Fecha</label>
+                                <input type="date" id="date" required 
+                                    class="w-full p-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1 text-xs">Categoría</label>
+                            <select id="categorySelect" class="w-full p-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none text-base">
+                                <!-- Categorías dinámicas -->
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 text-lg">
+                            Registrar Compra
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Gestionar Categorías -->
+                <div class="glass-card p-6 rounded-3xl shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 text-slate-800 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 11h.01M7 15h.01M13 7h.01M13 11h.01M13 15h.01M17 7h.01M17 11h.01M17 15h.01"/></svg>
+                        Nuevas Categorías
+                    </h2>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="newCatName" placeholder="Nombre..." class="flex-1 p-2 text-sm rounded-lg bg-slate-50 border-none">
+                        <input type="color" id="newCatColor" value="#6366f1" class="w-10 h-10 border-none bg-transparent cursor-pointer">
+                        <button id="addCatBtn" class="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                    </div>
+                    <div id="categoriesList" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
+                        <!-- Chips de categorías -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Central/Derecha: Visualización -->
+            <div class="lg:col-span-8 space-y-6">
+                <!-- Gráficos -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-card p-6 rounded-3xl shadow-sm h-64">
+                        <h3 class="text-sm font-bold text-slate-500 uppercase mb-4">Gastos por Categoría</h3>
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div class="glass-card p-6 rounded-3xl shadow-sm h-64">
+                        <h3 class="text-sm font-bold text-slate-500 uppercase mb-4">Tendencia Mensual</h3>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Historial -->
+                <div class="glass-card rounded-3xl shadow-sm overflow-hidden border border-slate-200">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">Últimos Movimientos</h2>
+                        <div class="flex gap-2">
+                            <select id="filterMonth" class="text-xs font-bold bg-slate-100 p-2 rounded-lg border-none">
+                                <option value="all">Todos los meses</option>
+                                <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+                                <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+                                <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+                                <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/50 text-slate-400 text-xs uppercase font-bold">
+                                    <th class="px-6 py-4">Fecha</th>
+                                    <th class="px-6 py-4">Descripción</th>
+                                    <th class="px-6 py-4">Categoría</th>
+                                    <th class="px-6 py-4 text-right">Monto</th>
+                                    <th class="px-6 py-4 text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="expenseTableBody" class="text-sm divide-y divide-slate-100">
+                                <!-- Filas dinámicas -->
+                            </tbody>
+                        </table>
+                        <div id="noData" class="py-20 text-center text-slate-400 hidden">
+                            No hay registros para este período.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- LÓGICA DE PWA (Manifest dinámico) ---
+        const manifest = {
+            "name": "Control de Gastos Pro",
+            "short_name": "GastosPro",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f1f5f9",
+            "theme_color": "#4f46e5",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzRGNjZFNSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xMiAxdjIybTExLTExSDEiLz48L3N2Zz4=",
+                    "sizes": "512x512",
+                    "type": "image/svg+xml",
+                    "purpose": "any maskable"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('#manifest-link').setAttribute('href', manifestURL);
+
+        // Registro de Service Worker (Simulado para que funcione el prompt de instalación)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('data:text/javascript;base64,c2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGV2ZW50ID0+IHsgfSk7').catch(() => {});
+            });
+        }
+
+        // --- MANEJO DE INSTALACIÓN ---
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.classList.remove('hidden');
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.classList.add('hidden');
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        // --- ESTADO INICIAL ---
+        let expenses = JSON.parse(localStorage.getItem('pro_expenses')) || [];
+        let categories = JSON.parse(localStorage.getItem('pro_categories')) || [
+            { name: 'Alimentación', color: '#f87171' },
+            { name: 'Transporte', color: '#60a5fa' },
+            { name: 'Vivienda', color: '#34d399' },
+            { name: 'Ocio', color: '#fbbf24' },
+            { name: 'Salud', color: '#f472b6' }
+        ];
+
+        let catChart, trendChart;
+
+        // --- INICIALIZACIÓN ---
+        function init() {
+            document.getElementById('date').valueAsDate = new Date();
+            document.getElementById('currentYearLabel').textContent = new Date().getFullYear();
+            
+            renderCategories();
+            updateStats();
+            renderTable();
+            initCharts();
+            
+            // Listeners
+            document.getElementById('expenseForm').addEventListener('submit', addExpense);
+            document.getElementById('addCatBtn').addEventListener('click', addCategory);
+            document.getElementById('filterMonth').addEventListener('change', renderTable);
+            document.getElementById('clearBtn').addEventListener('click', clearAll);
+        }
+
+        // --- LÓGICA DE CATEGORÍAS ---
+        function renderCategories() {
+            const select = document.getElementById('categorySelect');
+            const list = document.getElementById('categoriesList');
+            
+            select.innerHTML = '';
+            list.innerHTML = '';
+
+            categories.forEach((cat, index) => {
+                const opt = document.createElement('option');
+                opt.value = cat.name;
+                opt.textContent = cat.name;
+                select.appendChild(opt);
+
+                const chip = document.createElement('div');
+                chip.className = 'flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium shrink-0';
+                chip.innerHTML = `
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${cat.color}"></span>
+                    ${cat.name}
+                    ${index > 4 ? `<button onclick="deleteCategory(${index})" class="ml-1 text-slate-300 hover:text-red-500">×</button>` : ''}
+                `;
+                list.appendChild(chip);
+            });
+            localStorage.setItem('pro_categories', JSON.stringify(categories));
+        }
+
+        function addCategory() {
+            const name = document.getElementById('newCatName').value.trim();
+            const color = document.getElementById('newCatColor').value;
+            
+            if (name && !categories.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+                categories.push({ name, color });
+                document.getElementById('newCatName').value = '';
+                renderCategories();
+            }
+        }
+
+        function deleteCategory(index) {
+            categories.splice(index, 1);
+            renderCategories();
+        }
+
+        // --- LÓGICA DE GASTOS ---
+        function addExpense(e) {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value;
+            const category = document.getElementById('categorySelect').value;
+            const date = document.getElementById('date').value;
+
+            const expense = {
+                id: Date.now(),
+                amount,
+                description,
+                category,
+                date,
+                timestamp: new Date(date + 'T00:00:00').getTime()
+            };
+
+            expenses.push(expense);
+            localStorage.setItem('pro_expenses', JSON.stringify(expenses));
+            
+            document.getElementById('expenseForm').reset();
+            document.getElementById('date').valueAsDate = new Date();
+            
+            updateStats();
+            renderTable();
+            updateCharts();
+        }
+
+        function deleteExpense(id) {
+            expenses = expenses.filter(e => e.id !== id);
+            localStorage.setItem('pro_expenses', JSON.stringify(expenses));
+            updateStats();
+            renderTable();
+            updateCharts();
+        }
+
+        function updateStats() {
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            let todayTotal = 0;
+            let monthTotal = 0;
+            let yearTotal = 0;
+
+            expenses.forEach(exp => {
+                const expDate = new Date(exp.date + 'T00:00:00');
+                if (exp.date === todayStr) todayTotal += exp.amount;
+                if (expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear) monthTotal += exp.amount;
+                if (expDate.getFullYear() === currentYear) yearTotal += exp.amount;
+            });
+
+            const format = val => `$ ${val.toLocaleString('es-ES', { minimumFractionDigits: 2 })}`;
+            document.getElementById('totalToday').textContent = format(todayTotal);
+            document.getElementById('totalMonth').textContent = format(monthTotal);
+            document.getElementById('totalYear').textContent = format(yearTotal);
+        }
+
+        function renderTable() {
+            const body = document.getElementById('expenseTableBody');
+            const filterMonth = document.getElementById('filterMonth').value;
+            const noData = document.getElementById('noData');
+            
+            body.innerHTML = '';
+            let filtered = expenses.sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (filterMonth !== 'all') {
+                filtered = filtered.filter(exp => new Date(exp.date + 'T00:00:00').getMonth() == filterMonth);
+            }
+
+            if (filtered.length === 0) {
+                noData.classList.remove('hidden');
+            } else {
+                noData.classList.add('hidden');
+                filtered.forEach(exp => {
+                    const catInfo = categories.find(c => c.name === exp.category) || { color: '#cbd5e1' };
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-slate-50 transition-colors group';
+                    row.innerHTML = `
+                        <td class="px-4 md:px-6 py-4 text-slate-500 font-medium text-xs md:text-sm">${exp.date}</td>
+                        <td class="px-4 md:px-6 py-4 font-bold text-slate-800 text-sm">${exp.description}</td>
+                        <td class="px-4 md:px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] md:text-xs font-medium" style="background-color: ${catInfo.color}20; color: ${catInfo.color}">
+                                ${exp.category}
+                            </span>
+                        </td>
+                        <td class="px-4 md:px-6 py-4 text-right font-bold text-slate-900 text-sm">$ ${exp.amount.toFixed(2)}</td>
+                        <td class="px-4 md:px-6 py-4 text-center">
+                            <button onclick="deleteExpense(${exp.id})" class="text-slate-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </td>
+                    `;
+                    body.appendChild(row);
+                });
+            }
+        }
+
+        function initCharts() {
+            const ctx1 = document.getElementById('categoryChart').getContext('2d');
+            catChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, font: { size: 10 } } } } }
+            });
+
+            const ctx2 = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctx2, {
+                type: 'line',
+                data: { 
+                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                    datasets: [{ label: 'Gasto Mensual', data: Array(12).fill(0), borderColor: '#6366f1', tension: 0.4, fill: true, backgroundColor: '#6366f110' }]
+                },
+                options: { 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } }
+                }
+            });
+            updateCharts();
+        }
+
+        function updateCharts() {
+            const catData = {};
+            categories.forEach(c => catData[c.name] = 0);
+            expenses.forEach(e => { if(catData[e.category] !== undefined) catData[e.category] += e.amount; });
+            catChart.data.labels = Object.keys(catData);
+            catChart.data.datasets[0].data = Object.values(catData);
+            catChart.data.datasets[0].backgroundColor = categories.map(c => c.color);
+            catChart.update();
+
+            const monthlyData = Array(12).fill(0);
+            const currentYear = new Date().getFullYear();
+            expenses.forEach(e => {
+                const d = new Date(e.date + 'T00:00:00');
+                if(d.getFullYear() === currentYear) monthlyData[d.getMonth()] += e.amount;
+            });
+            trendChart.data.datasets[0].data = monthlyData;
+            trendChart.update();
+        }
+
+        function clearAll() {
+            if(confirm('¿Borrar todos los gastos y configuraciones?')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
